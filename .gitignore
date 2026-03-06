@@ -244,6 +244,7 @@ cython_debug/
 /.venv/
 /data/
 /db/*.duckdb
+/db/*.duckd
 /logs/
 /output/
 /settings/*.ini
