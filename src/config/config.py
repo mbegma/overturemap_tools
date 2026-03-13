@@ -57,3 +57,18 @@ class Config(object):
     TBL_NAME_DIVISION_AREA = config["TABLE_NAMES"]["division_area"]
     TBL_NAME_DIVISION_BOUNDARY = config["TABLE_NAMES"]["division_boundary"]
     TBL_NAME_DIVISION = config["TABLE_NAMES"]["division"]
+
+    TBL_NAME_BASE_LAND = config["TABLE_NAMES"]["base_land"]
+    TBL_NAME_BASE_LAND_USE = config["TABLE_NAMES"]["base_land_use"]
+    TBL_NAME_BASE_INFRASTRUCTURE = config["TABLE_NAMES"]["base_infrastructure"]
+    TBL_NAME_BASE_LAND_COVER = config["TABLE_NAMES"]["base_land_cover"]
+    TBL_NAME_BASE_WATER = config["TABLE_NAMES"]["base_water"]
+
+    TBL_NAME_PLACES_PLACE = config["TABLE_NAMES"]["places_place"]
+
+    TBL_NAME_TRANSPORTATION_SEGMENT = config["TABLE_NAMES"]["transportation_segment"]
+    TBL_NAME_TRANSPORTATION_CONNECTOR = config["TABLE_NAMES"]["transportation_connector"]
+
+    TBL_NAME_BUILDINGS_BUILDING = config["TABLE_NAMES"]["buildings_building"]
+    TBL_NAME_BUILDINGS_BUILDING_PART = config["TABLE_NAMES"]["buildings_building_part"]
+
