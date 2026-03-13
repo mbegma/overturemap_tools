@@ -83,7 +83,7 @@ class OrderProcessor:
 
     def _action_2(self):
         self._set_header('2. Получение информации о регионах РФ (RU)')
-        _regions = core.get_regions_name()
+        _regions = core.get_regions_short_name()
 
         if len(_regions) != 0:
             log.info("Получение информации о регионах РФ (RU) - OK")
@@ -93,9 +93,21 @@ class OrderProcessor:
                 print(f"{u.tab(2)}{_}")
             _local_reg = input("Укажите необходимый регион: ").strip()
             log.debug(f"выбранный регион: {_local_reg}")
-            if core.download_local_region_data(_local_reg):
+            if core.download_local_divisions_data(_local_reg):
                 log.debug(f"data downloaded successfully for {_local_reg}")
-                # запросить статистическую информацию о данных
+                log.debug("try to create spatial index ...")
+                core.create_local_divisions_spatial_indexes()
+                if core.get_local_divisions_data_stat():
+                    log.debug(f"data stats successfully for {_local_reg}")
+                    print(Fore.LIGHTBLUE_EX + Style.BRIGHT + f"Статистика по данным региона {_local_reg}:" + Fore.RESET + Style.RESET_ALL)
+                    # print(f"Статистика по данным региона {_local_reg}:")
+                    for _ in core.stat['divisions']:
+                        print(f"{u.tab(2)}Тип: {_['type']}")
+                        for _type_value in _['values']:
+                            print(f"{u.tab(3)}{_type_value['admin_level']}: {_type_value['count']}")
+
+                else:
+                    log.error(f"Ошибка при получении статистики:{core.get_last_error()}")
             else:
                 log.error(f"data for {_local_reg} download failed")
             return True
