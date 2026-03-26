@@ -12,6 +12,8 @@
 #        - 25.02.2026: start of development
 # -----------------------------------------------------
 import logging
+from typing import List
+
 from obstore.store import S3Store
 # import json
 from os import sep, path, makedirs
@@ -21,6 +23,19 @@ from src.common import utilities as u
 import duckdb
 from jinja2 import Template
 from src.common import query_templates
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TableInfo:
+    name: str = field(default_factory=str)
+    count: int = field(default_factory=int)
+    not_valid_geom: int = field(default_factory=int)
+    geom_type_count: list = field(default_factory=list)
+
+@dataclass
+class TableInfoList:
+    table_info_list: List[TableInfo] = field(default_factory=list)
 
 
 class Core:
@@ -29,6 +44,7 @@ class Core:
         self.log = class_logger or logging.getLogger(config.LOGGER_NAME)
         self.log.info(f"Hello, from {self.__class__.__name__} version: {self._ver}")
         self.error = None
+        self.downloaded_data_info = TableInfoList()
 
         self.releases = {}
         self.x_min = 0.0
@@ -36,14 +52,9 @@ class Core:
         self.y_min = 0.0
         self.y_max = 0.0
         self.db_name = "test_01.duckdb"
+        self.country = 'RU'
         self.local_region = ''
-        self.stat = {
-            'divisions': [],
-            'base': [],
-            'places': [],
-            'transportation': [],
-            'buildings': []
-        }
+
 
     def get_last_error(self):
         return self.error
@@ -62,15 +73,21 @@ class Core:
         self.y_min = parameters.get("y_min", 0.0)
         self.y_max = parameters.get("y_max", 0.0)
         self.local_region = parameters.get("local_region", "")
+        self.country = parameters.get("country", "RU")
         self.db_name = parameters.get("db_name", "test_01.duckdb")
         filename, file_extension = path.splitext(self.db_name)
         if file_extension == "":
             self.db_name = f"{filename}.duckdb"
+        self.downloaded_data_info.table_info_list.clear()
 
     def _create_spatial_index(self, table_name: str, geometry_field_name: str= 'geometry') -> bool:
+        """
+        Function for creating a spatial index
+        :param table_name: table name;
+        :param geometry_field_name: name of the geometry field;
+        :return: True/False
+        """
         self.log.debug(f"{u.tab()}create spatial index for {table_name} ...")
-        # CREATE INDEX geom_division_area_idx ON division_area USING RTREE (geometry);
-        # _query = f"CREATE INDEX geom_{table_name}_idx ON {table_name} USING RTREE ({geometry_field_name});"
         _query = Template(query_templates.QUERY_CREATE_SPATIAL_INDEX).render(
             table_name=table_name,
             geometry_field_name=geometry_field_name,
@@ -78,32 +95,39 @@ class Core:
         try:
             with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
                 con.sql(_query)
-
             return True
         except Exception as e:
             self._set_error(str(e.args))
             return False
 
-    def _download_data_by_bbox(self, table_list: list) -> bool:
-        self.log.debug(f"download data ...")
+    @u.time_of_function
+    def _get_downloaded_data_info(self, table_name: str) -> bool:
+        self.log.debug(f"{u.tab()}get information about {table_name} ...")
+        _table_info = TableInfo(name=table_name)
+        _table_list = [
+            {'num': 1, 'name': 'Total records count', 'query': query_templates.QUERY_DATA_COUNT},
+            {'num': 2, 'name': 'Count of Not valid Geometry', 'query': query_templates.QUERY_DATA_GEOM_NOT_VALID},
+            {'num': 3, 'name': 'Count by Geometry Type', 'query': query_templates.QUERY_DATA_GEOM_TYPE_COUNT},
+        ]
         try:
             with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
-                con.sql("INSTALL SPATIAL;")
                 con.sql("LOAD SPATIAL;")
-                con.sql("INSTALL httpfs;")
-                con.sql("LOAD httpfs;")
-                for _table in table_list:
-                    self.log.debug(f"{u.tab()}download data into <{_table['name']}> ...")
-                    _query = Template(_table['template']).render(
-                        table=_table['name'],
-                        release=self.releases['latest'],
-                        x_min=self.x_min, x_max=self.x_max,
-                        y_min=self.y_min, y_max=self.y_max
-                    )
-                    con.sql(_query)
-                    self.log.debug(f"{u.tab()}data to <{_table['name']}> downloaded successfully")
-                    self._create_spatial_index(_table['name'])
-                self.log.debug(f"{u.tab()}download - OK")
+                for _table in _table_list:
+                    _query = Template(_table['query']).render(table_name=table_name)
+                    _val = con.sql(_query).fetchall()
+                    if _table['num'] == 1:
+                        try:
+                            _table_info.count = _val[0][0]
+                        except IndexError:
+                            _table_info.count = 0
+                    elif _table['num'] == 2:
+                        try:
+                            _table_info.not_valid_geom = _val[0][0]
+                        except IndexError:
+                            _table_info.not_valid_geom = 0
+                    elif _table['num'] == 3:
+                        _table_info.geom_type_count = _val
+            self.downloaded_data_info.table_info_list.append(_table_info)
             return True
         except Exception as e:
             self._set_error(str(e.args))
@@ -111,9 +135,13 @@ class Core:
 
     # region CORE
     def fetch_releases_from_s3(self) -> dict:
+        """
+        Function to get the latest release and previous releases
+        :return: dict with structure {'latest': <str>, 'releases': [<str>]}
+        """
         _output = {}
-        _store = S3Store("overturemaps-us-west-2",
-                         region="us-west-2",
+        _store = S3Store(config.S3STORE_BUCKET,
+                         region=config.S3STORE_REGION,
                          skip_signature=True)
 
         _releases = _store.list_with_delimiter("release/")
@@ -128,193 +156,72 @@ class Core:
         self.releases = _output
         return _output
 
-    def get_regions_short_name(self) -> list:
+    def get_regions_short_name(self, country: str='RU') -> list:
         """
-        Получение списка сокращений названий субъектов РФ.
-        Далее по ним запрашивается информация о границах и территории
-        :return: список сокращенных имен
+        A function that gets a list of abbreviated names of subjects (regions) of a country.
+        :return: list of abbreviated names or empty list
         """
-        self.log.debug(f"get regions names ...")
-        _query = f"""
-            SELECT id, bbox, names.primary as name, region 
-            FROM read_parquet('s3://{config.S3STORE_BUCKET}/release/{self.releases['latest']}/theme=divisions/type=division/*.parquet') 
-            WHERE subtype = 'region' and country = 'RU' ORDER BY name;
-        """
+        self.log.debug(f"get regions names for {country} ...")
+        _query = Template(query_templates.QUERY_GET_REGIONS_NAMES).render(
+            release=self.releases['latest'],
+            country=self.country
+        )
         try:
             with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
                 _val = con.sql(_query).fetchall()
 
-            return [f"{x[2]}: {x[3]}" for x in _val] if _val is not None else []
+            return [f"{x[0]}: {x[1]}" for x in _val] if _val is not None else []
         except Exception as e:
             self._set_error(str(e.args))
             return []
-    # endregion
 
-    # region DIVISIONS
-    def download_local_divisions_data(self, local_region: str) -> bool:
+    @u.time_of_function
+    def download_data(self, params_list: list, is_bbox: bool=True) -> bool:
         """
-        Получение данных из темы divisions (границы, территории, точки) по РФ, с учетом субъекта
-        :param local_region: сокращенное название субъекта РФ
-        :return: True/False
+        A function that downloads data from s3 geoparquet file to a database table specified by a parameter.
+        :param params_list: list of objects, like {'name': <name table>, 'template': <template query name>}>
+        :param is_bbox: a switch that determines the condition by which to make a data request (bbox or region)
+        :return: True/False (error description in get_last_error() function
         """
-        self.log.info(f"Downloading local region data into {self.db_name} for region {local_region} ...")
-        _divisions_tables_list = [
-            {'name': config.TBL_NAME_DIVISION_AREA, 'template': query_templates.QUERY_DIVISION_AREA_TEMPLATE},
-            {'name': config.TBL_NAME_DIVISION_BOUNDARY, 'template': query_templates.QUERY_DIVISION_BOUNDARY},
-            {'name': config.TBL_NAME_DIVISION, 'template': query_templates.QUERY_DIVISION}
-        ]
+        self.log.debug(f"download data ...")
         try:
             with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
                 con.sql("INSTALL SPATIAL;")
                 con.sql("LOAD SPATIAL;")
                 con.sql("INSTALL httpfs;")
                 con.sql("LOAD httpfs;")
-                for _table in _divisions_tables_list:
-                    self.log.debug(f"download data into <{_table['name']}> for {local_region}")
-                    _query = Template(_table['template']).render(
-                        table=_table['name'],
-                        release=self.releases['latest'],
-                        local_region=local_region
-                    )
+                for _table in params_list:
+                    self.log.debug(f"{u.tab()}download data into <{_table['name']}> ...")
+                    _theme = config.TABLE_TO_THEME.get(_table['name'], None)
+                    if _theme is None:
+                        self._set_error(f"{u.tab()}theme for <{_table['name']}> not found")
+                        continue
+                    if is_bbox:
+                        _query = Template(_table['template']).render(
+                            table=_table['name'],
+                            release=self.releases['latest'],
+                            theme=_theme['theme'], type=_theme['type'],
+                            x_min=self.x_min, x_max=self.x_max,
+                            y_min=self.y_min, y_max=self.y_max
+                        )
+                    else:
+                        _query = Template(_table['template']).render(
+                            table=_table['name'],
+                            release=self.releases['latest'],
+                            theme=_theme['theme'], type=_theme['type'],
+                            local_region=self.local_region,
+                            country=self.country
+                        )
                     con.sql(_query)
-                    self.log.debug(f"data to {_table['name']}> for {local_region} downloaded successfully")
+                    self.log.debug(f"{u.tab()}data to <{_table['name']}> downloaded successfully")
                     self._create_spatial_index(_table['name'])
-                self.log.debug(f"download - OK")
+                    self._get_downloaded_data_info(_table['name'])
+                self.log.debug(f"{u.tab()}download - OK")
             return True
         except Exception as e:
             self._set_error(str(e.args))
             return False
 
-    def create_local_divisions_spatial_indexes(self):
-        for _type in [config.TBL_NAME_DIVISION, config.TBL_NAME_DIVISION_BOUNDARY, config.TBL_NAME_DIVISION_AREA]:
-            if self._create_spatial_index(_type):
-                self.log.debug(f"{u.tab()}create spatial index for {_type} - OK")
-            else:
-                self.log.debug(f"{u.tab()}create spatial index for {_type} - Failed")
-
-    def get_local_divisions_data_stat(self) -> bool:
-        """
-        Получение статистики
-        -- Вывод статистики по уровням административного деления
-        SELECT subtype as admin_level, COUNT(*) as count FROM division GROUP BY subtype ORDER BY count DESC;
-        SELECT subtype as admin_level, COUNT(*) as count FROM division_area GROUP BY subtype ORDER BY count DESC;
-        SELECT subtype as admin_level, COUNT(*) as count FROM division_boundary GROUP BY subtype ORDER BY count DESC;
-        :return: True/False
-        """
-        self.log.debug(f"getting local divisions data statistic ...")
-        try:
-            with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
-                for _type in [config.TBL_NAME_DIVISION, config.TBL_NAME_DIVISION_BOUNDARY, config.TBL_NAME_DIVISION_AREA]:
-                    _query = f"SELECT subtype as admin_level, COUNT(*) as count FROM {_type} GROUP BY subtype ORDER BY count DESC;"
-                    _val = con.sql(_query).fetchall()
-                    # _obj = {'type': _type, 'values': [{'admin_level': x[0], 'count': x[1]} for x in _val]}
-                    # self.stat['divisions'].append({_type: [{'admin_level': x[0], 'count': x[1]} for x in _val]})
-                    self.stat['divisions'].append(
-                        {
-                            'type': _type,
-                            'values': [{'admin_level': x[0], 'count': x[1]} for x in _val]
-                        }
-                    )
-                return True
-        except Exception as e:
-            self._set_error(str(e.args))
-            return False
-    # endregion
-
-    # region BASE
-    def download_local_base_data(self, local_region: str) -> bool:
-        self.log.info(f"Downloading BASE local region data into {self.db_name} for region {local_region} ...")
-
-        _base_tables_list = [
-            {'name': config.TBL_NAME_BASE_LAND, 'template': query_templates.QUERY_BASE_LAND_TEMPLATE},
-            {'name': config.TBL_NAME_BASE_LAND_USE, 'template': query_templates.QUERY_BASE_LAND_USE_TEMPLATE},
-            {'name': config.TBL_NAME_BASE_INFRASTRUCTURE, 'template': query_templates.QUERY_BASE_INFRASTRUCTURE_TEMPLATE},
-            {'name': config.TBL_NAME_BASE_LAND_COVER, 'template': query_templates.QUERY_BASE_LAND_COVER_TEMPLATE},
-            {'name': config.TBL_NAME_BASE_WATER, 'template': query_templates.QUERY_BASE_WATER_TEMPLATE}
-        ]
-        try:
-            with duckdb.connect(f"{config.DB_DIR}{sep}{self.db_name}") as con:
-                con.sql("INSTALL SPATIAL;")
-                con.sql("LOAD SPATIAL;")
-                con.sql("INSTALL httpfs;")
-                con.sql("LOAD httpfs;")
-                for _base in _base_tables_list:
-                    self.log.debug(f"download data into <{_base['name']}> for {local_region}")
-                    _query = Template(_base['template']).render(
-                        table=_base['name'],
-                        release=self.releases['latest'],
-                        x_min=self.x_min, x_max=self.x_max,
-                        y_min=self.y_min, y_max=self.y_max
-                    )
-                    con.sql(_query)
-                    self.log.debug(f"data to {_base['name']}> for {local_region} downloaded successfully")
-                    self._create_spatial_index(_base['name'])
-                self.log.debug(f"download - OK")
-            return True
-        except Exception as e:
-            self._set_error(str(e.args))
-            return False
-    # endregion
-
-    # region PLACES
-    def download_local_places_data(self) -> bool:
-        """
-        Получение данных из темы places
-        :return: True/False
-        """
-        self.log.info(f"Downloading local PLACES data into {self.db_name} ...")
-        _places_tables_list = [
-            {'name': config.TBL_NAME_PLACES_PLACE, 'template': query_templates.QUERY_PLACES_PLACE_TEMPLATE}
-        ]
-        if self._download_data_by_bbox(_places_tables_list):
-            self._set_info(f"local PLACES data downloaded successfully")
-            return True
-        else:
-            self._set_error(f"local PLACES data downloaded failed: {self.get_last_error()}")
-            return False
-
-    # endregion
-
-    # region TRANSPORTATION
-    def download_local_transportation_data(self) -> bool:
-        """
-        Получение данных из темы transportation
-        :return: True/False
-        """
-        self.log.info(f"Downloading local TRANSPORTATION data into {self.db_name} ...")
-        _tables_list = [
-            {'name': config.TBL_NAME_TRANSPORTATION_SEGMENT,
-             'template': query_templates.QUERY_TRANSPORTATION_SEGMENT_TEMPLATE},
-            {'name': config.TBL_NAME_TRANSPORTATION_CONNECTOR,
-             'template': query_templates.QUERY_TRANSPORTATION_CONNECTOR_TEMPLATE}
-        ]
-        if self._download_data_by_bbox(_tables_list):
-            self._set_info(f"local TRANSPORTATION data downloaded successfully")
-            return True
-        else:
-            self._set_error(f"local TRANSPORTATION data downloaded failed: {self.get_last_error()}")
-            return False
-    # endregion
-
-    # region BUILDINGS
-    def download_local_buildings_data(self) -> bool:
-        """
-        Получение данных из темы BUILDINGS
-        :return: True/False
-        """
-        self.log.info(f"Downloading local BUILDINGS data into {self.db_name} ...")
-        _tables_list = [
-            {'name': config.TBL_NAME_BUILDINGS_BUILDING,
-             'template': query_templates.QUERY_BUILDINGS_BUILDING_TEMPLATE},
-            {'name': config.TBL_NAME_BUILDINGS_BUILDING_PART,
-             'template': query_templates.QUERY_BUILDINGS_BUILDING_PART_TEMPLATE}
-        ]
-        if self._download_data_by_bbox(_tables_list):
-            self._set_info(f"local BUILDINGS data downloaded successfully")
-            return True
-        else:
-            self._set_error(f"local BUILDINGS data downloaded failed: {self.get_last_error()}")
-            return False
     # endregion
 
 
@@ -336,7 +243,7 @@ def main():
     # endregion
 
     cl = Core(class_logger=log)
-
+    # 41.298079,56.799198,41.500639,56.900203 - Шуя
     _local_reg = "RU-IVA"
     cl.set_parameters(
         {
@@ -344,33 +251,49 @@ def main():
             'x_max': 41.500639,
             'y_min': 56.799198,
             'y_max': 56.900203,
-            'db_name': 'test_01',
-            'local_region': _local_reg
+            'db_name': 'ru-iva-s.duckdb',
+            'local_region': _local_reg,
+            'country': 'RU'
         }
     )
+    # Ульяновская обл.: RU-ULY 45.756,52.4625,50.4058,54.9617
+    # _local_reg = "RU-ULY"
+    # cl.set_parameters(
+    #     {
+    #         'x_min': 45.756,
+    #         'x_max': 52.4625,
+    #         'y_min': 51.44,
+    #         'y_max': 54.9617,
+    #         'db_name': 'ru_uly.duckdb',
+    #         'local_region': _local_reg
+    #     }
+    # )
 
+    # Башкортостан: RU-BA  53.12,51.44,60.29,56.73
+    # _local_reg = "RU-BA"
+    # cl.set_parameters(
+    #     {
+    #         'x_min': 53.12,
+    #         'x_max': 60.29,
+    #         'y_min': 51.44,
+    #         'y_max': 56.73,
+    #         'db_name': 'ru_ba.duckdb',
+    #         'local_region': _local_reg
+    #     }
+    # )
 
     releases = cl.fetch_releases_from_s3()
     log.debug(f"{releases}")
 
-    # _regions_names = cl.get_regions_short_name()
-    # log.debug(f"{_regions_names}")
+    _regions_names = cl.get_regions_short_name()
+    log.debug(f"{_regions_names}")
 
+    ret = cl._get_downloaded_data_info('base_land')
+    if ret:
+        print(cl.downloaded_data_info.table_info_list)
+    else:
+        print(cl.get_last_error())
 
-    # if cl.download_local_divisions_data(_local_reg):
-    #     log.debug(f"data downloaded successfully for {_local_reg}")
-    # else:
-    #     log.error(f"data for {_local_reg} download failed: {cl.get_last_error()}")
-
-    # ret = cl.get_local_divisions_data_stat()
-    # print(cl.stat)
-
-    # ret = cl.download_local_base_data(_local_reg)
-    # print(ret)
-
-    ret = cl.download_local_places_data()
-    ret = cl.download_local_transportation_data()
-    ret = cl.download_local_buildings_data()
     print(ret)
 
 if __name__ == "__main__":
