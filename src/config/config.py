@@ -51,8 +51,8 @@ class Config(object):
     create_dir(DB_DIR)
     # endregion
 
-    S3STORE_BUCKET = config["S3STORE"]["bucket"]
-    S3STORE_REGION = config["S3STORE"]["region"]
+    S3STORE_BUCKET = config["S3STORE"]["bucket"] # overturemaps-us-west-2
+    S3STORE_REGION = config["S3STORE"]["region"] # us-west-2
 
     TBL_NAME_DIVISION_AREA = config["TABLE_NAMES"]["division_area"]
     TBL_NAME_DIVISION_BOUNDARY = config["TABLE_NAMES"]["division_boundary"]
@@ -72,3 +72,18 @@ class Config(object):
     TBL_NAME_BUILDINGS_BUILDING = config["TABLE_NAMES"]["buildings_building"]
     TBL_NAME_BUILDINGS_BUILDING_PART = config["TABLE_NAMES"]["buildings_building_part"]
 
+    TABLE_TO_THEME = {
+        'base_land': {'theme': 'base', 'type': 'land'},
+        'base_land_use': {'theme': 'base', 'type': 'land_use'},
+        'base_infrastructure': {'theme': 'base', 'type': 'infrastructure'},
+        'base_land_cover': {'theme': 'base', 'type': 'land_cover'},
+        'base_water': {'theme': 'base', 'type': 'water'},
+        'places_place': {'theme': 'places', 'type': 'place'},
+        'transportation_segment': {'theme': 'transportation', 'type': 'segment'},
+        'transportation_connector': {'theme': 'transportation', 'type': 'connector'},
+        'buildings_building': {'theme': 'buildings', 'type': 'building'},
+        'buildings_building_part': {'theme': 'buildings', 'type': 'building_part'},
+        'divisions_division': {'theme': 'divisions', 'type': 'division'},
+        'divisions_division_boundary': {'theme': 'divisions', 'type': 'division_boundary'},
+        'divisions_division_area': {'theme': 'divisions', 'type': 'division_area'},
+    }
