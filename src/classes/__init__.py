@@ -11,7 +11,7 @@
 #        - 15.05.2024: start of development
 # -----------------------------------------------------
 from src.classes.error_classes import InputDataError, ProcessDataError
-from src.classes.core import Core
+from src.classes.core import Core, TableInfo
 
 
 
