@@ -13,8 +13,40 @@
 # -----------------------------------------------------
 from src.config import config
 
+QUERY_GET_REGIONS_NAMES = f"""
+SELECT 
+    names.primary as name, region 
+FROM 
+    read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme=divisions/type=division/*.parquet') 
+WHERE 
+    subtype = 'region' and country = '{{{{ country }}}}' ORDER BY name;
+"""
 # _query = f"CREATE INDEX geom_{table_name}_idx ON {table_name} USING RTREE ({geometry_field_name});"
 QUERY_CREATE_SPATIAL_INDEX = "CREATE INDEX geom_{{ table_name }}_idx ON {{ table_name }} USING RTREE ({{ geometry_field_name }});"
+
+QUERY_DOWNLOAD_BY_BBOX = f"""
+CREATE OR REPLACE TABLE {{{{ table }}}} AS (
+SELECT * 
+FROM 
+read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme={{{{ theme }}}}/type={{{{ type }}}}/*.parquet') 
+WHERE 
+bbox.xmin BETWEEN {{{{ x_min }}}} AND {{{{ x_max }}}} AND bbox.ymin BETWEEN {{{{ y_min }}}} AND {{{{ y_max }}}});
+"""
+
+QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY = f"""
+CREATE OR REPLACE TABLE {{{{ table }}}} AS (
+SELECT *   
+FROM 
+read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release}}}}/theme={{{{ theme }}}}/type={{{{ type }}}}/*.parquet') 
+WHERE region = '{{{{ local_region }}}}' and country = '{{{{ country }}}}');
+"""
+
+QUERY_DATA_COUNT = "SELECT count(*) as count FROM {{ table_name }};"
+QUERY_DATA_GEOM_NOT_VALID = "SELECT count(*) as count FROM {{ table_name }} where not ST_IsValid(geometry);"
+QUERY_DATA_GEOM_TYPE_COUNT = """
+SELECT DISTINCT ST_GeometryType(geometry) as geom_type, COUNT(*) as count 
+FROM {{ table_name }} GROUP BY geom_type ORDER BY count DESC;
+"""
 
 # region DIVISION
 QUERY_DIVISION_AREA_TEMPLATE = f"""
@@ -67,19 +99,18 @@ WHERE bbox.xmin BETWEEN {{{{ x_min }}}} AND {{{{ x_max }}}} AND bbox.ymin BETWEE
 """
 QUERY_BASE_WATER_TEMPLATE = f"""
 CREATE OR REPLACE TABLE {{{{ table }}}} AS (
-SELECT id, geometry, bbox, names.primary as name, categories.primary as categories, basic_category, 
-taxonomy.primary as taxonomy, confidence, operating_status, CAST(addresses AS JSON) as addresses   
-FROM read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme=places/type=place/*.parquet') 
+SELECT id, geometry, bbox, subtype, class, names.primary as name, CAST(source_tags AS JSON) as source_tags, is_salt, is_intermittent    
+FROM read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme=base/type=water/*.parquet') 
 WHERE bbox.xmin BETWEEN {{{{ x_min }}}} AND {{{{ x_max }}}} AND bbox.ymin BETWEEN {{{{ y_min }}}} AND {{{{ y_max }}}});
-);
 """
 # endregion
 
 # region PLACES
-QUERY_PLACES_PLACE_TEMPLATE = F"""
+QUERY_PLACES_PLACE_TEMPLATE = f"""
 CREATE OR REPLACE TABLE {{{{ table }}}} AS (
-SELECT id, geometry, bbox, subtype, class, names.primary as name, CAST(source_tags AS JSON) as source_tags, is_salt, is_intermittent   
-FROM read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme=base/type=water/*.parquet') 
+SELECT id, geometry, bbox, names.primary as name, categories.primary as categories, basic_category, 
+taxonomy.primary as taxonomy, confidence, operating_status, CAST(addresses AS JSON) as addresses    
+FROM read_parquet('s3://{config.S3STORE_BUCKET}/release/{{{{ release }}}}/theme=places/type=place/*.parquet') 
 WHERE bbox.xmin BETWEEN {{{{ x_min }}}} AND {{{{ x_max }}}} AND bbox.ymin BETWEEN {{{{ y_min }}}} AND {{{{ y_max }}}});
 """
 # endregion
