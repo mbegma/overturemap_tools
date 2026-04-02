@@ -2,7 +2,7 @@
 # -----------------------------------------------------
 # Project Name: overturemaps
 # Name: core
-# Filename: core.py
+# Filename: download_core.py
 # Author: mbegma
 # Create data: 25.02.2026
 # Description: 
@@ -38,7 +38,7 @@ class TableInfoList:
     table_info_list: List[TableInfo] = field(default_factory=list)
 
 
-class Core:
+class DownloadCore:
     _ver = "1.0.0"
     def __init__(self, class_logger=None, **kwargs):
         self.log = class_logger or logging.getLogger(config.LOGGER_NAME)
@@ -242,7 +242,7 @@ def main():
     log.info(f"Started {__name__}")
     # endregion
 
-    cl = Core(class_logger=log)
+    cl = DownloadCore(class_logger=log)
     # 41.298079,56.799198,41.500639,56.900203 - Шуя
     _local_reg = "RU-IVA"
     cl.set_parameters(
