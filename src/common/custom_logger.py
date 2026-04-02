@@ -19,8 +19,8 @@ LOG_HDL_ROT_FILE = 1
 LOG_HDL_CNSL = 2
 LOG_FMT = {
     "standard": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    "detailed": "%(levelname)s - %(asctime)s - %(name)s | [%(filename)s:%(lineno)d]: %(message)s",
-    "extra_1": "%(levelname)s | %(asctime)s.%(msecs)d [%(name)s (%(module)s:%(lineno)d)] >> %(message)s",
+    "detailed": "%(levelname)s - %(asctime)s - %(name)s | [%(filename)s:%(lineno)d]:\t%(message)s",
+    "extra_1": "%(levelname)s | %(asctime)s.%(msecs)d [%(name)s (%(module)s:%(lineno)d)]\t>> %(message)s",
     "extra_2": "%(levelname)s | [%(asctime)s.%(msecs)03d]\t<%(module)s:%(lineno)d>\t%(message)s"
 }
 
