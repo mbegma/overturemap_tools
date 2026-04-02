@@ -17,12 +17,12 @@ from src.config import config
 from src.common import create_logger_ext, get_log_filename
 from src.common import LOG_HDL_CNSL, LOG_HDL_FILE, LOG_FMT
 from src.common import utilities as u
-from src.classes import Core
+from src.classes import DownloadCore
 from src.common import query_templates
 
 
 log = create_logger_ext(logger_name=config.LOGGER_NAME,
-                        logger_file_name=get_log_filename(config.LOG_DIR),
+                        logger_file_name=get_log_filename(config.LOG_DIR, 'download'),
                         logger_handler_type_dict={
                             LOG_HDL_FILE: {"level": logging.DEBUG, "format": LOG_FMT['extra_1']},
                             LOG_HDL_CNSL: {"level": logging.DEBUG, "format": LOG_FMT['detailed']}
@@ -49,7 +49,7 @@ def main():
 
     log.info(f"BBox: {args.xmin}, {args.xmax}, {args.ymin}, {args.ymax}")
     log.info(f"Local Region Name: {args.lreg}")
-    core = Core(class_logger=log)
+    core = DownloadCore(class_logger=log)
     core.set_parameters(
         {
             'x_min': args.xmin,
