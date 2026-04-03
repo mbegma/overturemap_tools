@@ -65,9 +65,9 @@ def main():
     log.info(f"Last release: {releases['latest']}")
     log.info(f"Releases: {releases['releases']}")
     _table_region_list = [
-        {'name': config.TBL_NAME_DIVISION, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
-        {'name': config.TBL_NAME_DIVISION_BOUNDARY, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
-        {'name': config.TBL_NAME_DIVISION_AREA, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
+        {'name': config.TBL_NAME_DIVISIONS_DIVISION, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
+        {'name': config.TBL_NAME_DIVISIONS_BOUNDARY, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
+        {'name': config.TBL_NAME_DIVISIONS_AREA, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
     ]
     log.info(f"Start to download data by Region into: {', '.join([x['name'] for x in _table_region_list])}")
     if core.download_data(_table_region_list, is_bbox=False):
