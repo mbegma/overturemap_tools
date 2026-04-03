@@ -54,9 +54,9 @@ class Config(object):
     S3STORE_BUCKET = config["S3STORE"]["bucket"] # overturemaps-us-west-2
     S3STORE_REGION = config["S3STORE"]["region"] # us-west-2
 
-    TBL_NAME_DIVISION_AREA = config["TABLE_NAMES"]["division_area"]
-    TBL_NAME_DIVISION_BOUNDARY = config["TABLE_NAMES"]["division_boundary"]
-    TBL_NAME_DIVISION = config["TABLE_NAMES"]["division"]
+    TBL_NAME_DIVISIONS_AREA = config["TABLE_NAMES"]["division_area"]
+    TBL_NAME_DIVISIONS_BOUNDARY = config["TABLE_NAMES"]["division_boundary"]
+    TBL_NAME_DIVISIONS_DIVISION = config["TABLE_NAMES"]["division"]
 
     TBL_NAME_BASE_LAND = config["TABLE_NAMES"]["base_land"]
     TBL_NAME_BASE_LAND_USE = config["TABLE_NAMES"]["base_land_use"]
