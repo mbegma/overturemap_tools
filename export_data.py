@@ -19,14 +19,18 @@ from src.common import create_logger_ext, get_log_filename
 from src.common import LOG_HDL_CNSL, LOG_HDL_FILE, LOG_FMT
 from src.common import utilities as u
 from src.common import EXPORT_FORMAT
+from src.classes import ExportCore
 
 log = create_logger_ext(logger_name=config.LOGGER_NAME,
                         logger_file_name=get_log_filename(config.LOG_DIR, 'export'),
                         logger_handler_type_dict={
                             LOG_HDL_FILE: {"level": logging.DEBUG, "format": LOG_FMT['extra_1']},
-                            LOG_HDL_CNSL: {"level": logging.DEBUG, "format": LOG_FMT['detailed']}
+                            LOG_HDL_CNSL: {"level": logging.INFO, "format": LOG_FMT['detailed']}
                         })
 log.info(f"Hello from logger {log.name}!")
+
+
+
 
 def main():
     log.info(f"Start process to export Overture Maps data...")
@@ -70,6 +74,26 @@ def main():
     log.info(f"Reproject data to Web Mercator: {args.is_wm}")
     log.info(f"Export data to format: {args.format}")
     log.info('-' * 60)
+
+    export_class = ExportCore(class_logger=log)
+    export_class.set_parameters(
+        {
+            'db_name': args.dbname,
+            'output_dir': args.output_dir,
+            'tables': args.tables,
+            'is_wm': args.is_wm,
+            'format': args.format
+        }
+    )
+
+    if export_class.export_data():
+        log.info(f"Export Overture Maps data - OK")
+    else:
+        log.error(f"Export Overture Maps data - Fail: {export_class.get_last_error()}")
+
+
+
+
 
     log.info(f"Process to export Overture Maps data finished")
 
