@@ -47,8 +47,13 @@ def main():
         log.error(f"Database name not specified, please specify dbname parameter")
         return
 
+    log.info('-'*60)
+    log.info(f"DuckDB name: {args.dbname}")
     log.info(f"BBox: {args.xmin}, {args.xmax}, {args.ymin}, {args.ymax}")
     log.info(f"Local Region Name: {args.lreg}")
+    log.info(f"Country Short Name: {args.country}")
+    log.info('-' * 60)
+
     core = DownloadCore(class_logger=log)
     core.set_parameters(
         {
@@ -64,30 +69,32 @@ def main():
     releases = core.fetch_releases_from_s3()
     log.info(f"Last release: {releases['latest']}")
     log.info(f"Releases: {releases['releases']}")
+
     _table_region_list = [
-        {'name': config.TBL_NAME_DIVISIONS_DIVISION, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
-        {'name': config.TBL_NAME_DIVISIONS_BOUNDARY, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
-        {'name': config.TBL_NAME_DIVISIONS_AREA, 'template': query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY},
+        config.TBL_NAME_DIVISIONS_DIVISION,
+        config.TBL_NAME_DIVISIONS_BOUNDARY,
+        config.TBL_NAME_DIVISIONS_AREA
     ]
-    log.info(f"Start to download data by Region into: {', '.join([x['name'] for x in _table_region_list])}")
+    log.info(f"Start to download data by Region into: {', '.join([x for x in _table_region_list])}")
     if core.download_data(_table_region_list, is_bbox=False):
         log.info(f"Data by Region downloaded successfully")
     else:
         log.error(f"Errors while downloading data by Region: {core.get_last_error()}")
 
     _table_bbox_list = [
-            {'name': config.TBL_NAME_BASE_LAND, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BASE_LAND_USE, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BASE_INFRASTRUCTURE, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BASE_LAND_COVER, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BASE_WATER, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_PLACES_PLACE, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_TRANSPORTATION_SEGMENT, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_TRANSPORTATION_CONNECTOR, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BUILDINGS_BUILDING, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX},
-            {'name': config.TBL_NAME_BUILDINGS_BUILDING_PART, 'template': query_templates.QUERY_DOWNLOAD_BY_BBOX}
-        ]
-    log.info(f"Start to download data by BBox into: {', '.join([x['name'] for x in _table_bbox_list])}")
+        config.TBL_NAME_BASE_LAND,
+        config.TBL_NAME_BASE_LAND_USE,
+        config.TBL_NAME_BASE_INFRASTRUCTURE,
+        config.TBL_NAME_BASE_LAND_COVER,
+        config.TBL_NAME_BASE_WATER,
+        config.TBL_NAME_BASE_BATHYMETRY,
+        config.TBL_NAME_PLACES_PLACE,
+        config.TBL_NAME_TRANSPORTATION_SEGMENT,
+        config.TBL_NAME_TRANSPORTATION_CONNECTOR,
+        config.TBL_NAME_BUILDINGS_BUILDING,
+        config.TBL_NAME_BUILDINGS_BUILDING_PART,
+    ]
+    log.info(f"Start to download data by BBox into: {', '.join([x for x in _table_bbox_list])}")
     if core.download_data(_table_bbox_list):
         log.info(f"Data by BBox downloaded successfully")
     else:
