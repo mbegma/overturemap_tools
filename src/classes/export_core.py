@@ -13,6 +13,7 @@
 # -----------------------------------------------------
 import logging
 from typing import List
+import threading
 
 from pathlib import Path
 
@@ -34,7 +35,7 @@ TABLES = {
         "geom": ['pnt', 'lin', 'pol']
     },
     config.TBL_NAME_BASE_LAND_COVER: {
-        "template": query_templates.QUERY_EXPORT_BASE_INFRASTRUCTURE,
+        "template": query_templates.QUERY_EXPORT_BASE_LAND_COVER,
         "geom": ['pnt', 'lin', 'pol']
     },
     config.TBL_NAME_BASE_INFRASTRUCTURE: {
@@ -44,6 +45,10 @@ TABLES = {
     config.TBL_NAME_BASE_WATER: {
         "template": query_templates.QUERY_EXPORT_BASE_WATER,
         "geom": ['pnt', 'lin', 'pol']
+    },
+    config.TBL_NAME_BASE_BATHYMETRY: {
+        "template": query_templates.QUERY_EXPORT_BASE_BATHYMETRY,
+        "geom": ['pol']
     },
     config.TBL_NAME_PLACES_PLACE: {
         "template": query_templates.QUERY_EXPORT_PLACES_PLACE,
@@ -62,7 +67,7 @@ TABLES = {
         "geom": ['pnt', 'lin', 'pol']
     },
     config.TBL_NAME_TRANSPORTATION_CONNECTOR: {
-        "template": query_templates.QUERY_EXPORT_TRANSPORTATION_SEGMENT,
+        "template": query_templates.QUERY_EXPORT_TRANSPORTATION_CONNECTOR,
         "geom": ['pnt', 'lin', 'pol']
     },
     config.TBL_NAME_DIVISIONS_AREA: {
@@ -85,6 +90,7 @@ class ExportCore:
         self.log = class_logger or logging.getLogger(config.LOGGER_NAME)
         self.log.info(f"Hello, from {self.__class__.__name__} version: {self._ver}")
         self.error = None
+        self._lock = threading.Lock()
 
         self.db_name = kwargs.get("dbname", "")
         self.output_dir: str = kwargs.get("output_dir", "")
@@ -96,11 +102,13 @@ class ExportCore:
         return self.error
 
     def _set_info(self, info):
-        self.log.info(info)
+        with self._lock:
+            self.log.info(info)
 
     def _set_error(self, info):
-        self.error = info
-        self.log.error(info)
+        with self._lock:
+            self.error = info
+            self.log.error(info)
 
     def set_parameters(self, parameters: dict):
         self.log.debug(parameters)
@@ -154,9 +162,9 @@ class ExportCore:
         _table = TABLES[table_name]
         try:
             with duckdb.connect(Path(config.DB_DIR) / self.db_name) as con:
-                con.sql("INSTALL SPATIAL;")
+                # con.sql("INSTALL SPATIAL;")
                 con.sql("LOAD SPATIAL;")
-                con.sql("INSTALL json;")
+                # con.sql("INSTALL json;")
                 con.sql("LOAD json;")
                 for geom in _table['geom']:
                     _file_name = self._create_output_file_name(table_name, geom)
@@ -180,15 +188,48 @@ class ExportCore:
             self._set_error(str(e.args))
             return False
 
-    def export(self) -> bool:
+    @u.time_of_function
+    def export_data(self) -> bool:
+        if self.error:
+            return False
+
+        if len(self.tables_list) == 0:
+            self._set_error("No tables specified for export.")
+            return False
+
+        errors = []
+        threads = []
+        results_lock = threading.Lock()
+
+        def export_table_thread(thread_table_name: str):
+            """Вспомогательная функция для экспорта таблицы в отдельном потоке"""
+            if self._export_table(table_name=thread_table_name):
+                self._set_info(f"The {thread_table_name} table export was successful.")
+            else:
+                error_msg = f"Error exporting table {thread_table_name}. Error: {self.get_last_error()}"
+                with results_lock:
+                    errors.append(error_msg)
+                self._set_error(error_msg)
+
         try:
+            # Создаем и запускаем потоки для каждой таблицы
             for table_name in self.tables_list:
-                if self._export_table(table_name=table_name):
-                    self._set_info(f"The {table_name} table export was successful.")
-                else:
-                    self._set_error(f"Error exporting table {table_name}. "
-                                    f"Error: {self.get_last_error()}")
+                thread = threading.Thread(target=export_table_thread, args=(table_name,), daemon=False)
+                threads.append(thread)
+                thread.start()
+
+            # Ожидаем завершения всех потоков
+            for thread in threads:
+                thread.join()
+
+            # Возвращаем результат
+            if errors:
+                self._set_error(f"Export completed with errors: {'; '.join(errors)}")
+                return False
+
+            self._set_info("All tables exported successfully.")
             return True
+
         except Exception as e:
             self._set_error(str(e.args))
             return False
@@ -224,7 +265,7 @@ def main():
 
 
         cl.set_parameters(params)
-        ret = cl.export()
+        ret = cl.export_data()
         print(ret)
     except Exception as e:
         log.error(str(e.args))
