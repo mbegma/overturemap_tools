@@ -56,6 +56,21 @@ POL_GEOM = "'POLYGON', 'MULTIPOLYGON'"
 SR_WGS84 = 'EPSG:4326'
 SR_WM = 'EPSG:3857'
 
+QUERY_EXPORT_BASE_BATHYMETRY = f"""
+COPY(
+	SELECT 
+		id,
+		{{% if is_wm %}}ST_Transform(geometry, '{SR_WGS84}', '{SR_WM}', true) as geometry,{{% else %}}geometry,{{% endif %}} 
+		depth, CAST(cartography AS JSON) as cartography, 
+		CAST(sources AS JSON) as sources
+	FROM {{{{ table_name }}}} 
+	WHERE ST_GeometryType(geometry) in ({{% if geom == 'pnt' %}}{PNT_GEOM}{{% elif geom == 'lin' %}}{LIN_GEOM}{{% else %}}{POL_GEOM}{{% endif %}}) 
+) TO '{{{{ file_name }}}}' 
+WITH (FORMAT GDAL, DRIVER '{{{{ driver }}}}', LAYER_NAME '{{{{ layer_name }}}}', 
+SRS{{% if is_wm %}} '{SR_WM}', {{% else %}} '{SR_WGS84}', {{% endif %}} 
+LAYER_CREATION_OPTIONS 'WRITE_BBOX=YES');
+"""
+
 QUERY_EXPORT_BASE_LAND = f"""
 COPY(
 	SELECT 
