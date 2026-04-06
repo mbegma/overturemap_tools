@@ -176,10 +176,10 @@ class DownloadCore:
             return []
 
     @u.time_of_function
-    def download_data(self, params_list: list, is_bbox: bool=True) -> bool:
+    def download_data(self, table_list: list, is_bbox: bool=True) -> bool:
         """
         A function that downloads data from s3 geoparquet file to a database table specified by a parameter.
-        :param params_list: list of objects, like {'name': <name table>, 'template': <template query name>}>
+        :param table_list: list of tables, with tables name
         :param is_bbox: a switch that determines the condition by which to make a data request (bbox or region)
         :return: True/False (error description in get_last_error() function
         """
@@ -190,32 +190,34 @@ class DownloadCore:
                 con.sql("LOAD SPATIAL;")
                 con.sql("INSTALL httpfs;")
                 con.sql("LOAD httpfs;")
-                for _table in params_list:
-                    self.log.debug(f"{u.tab()}download data into <{_table['name']}> ...")
-                    _theme = config.TABLE_TO_THEME.get(_table['name'], None)
+                for _table in table_list:
+                    self.log.debug(f"{u.tab()}download data into <{_table}> ...")
+                    _theme = config.TABLE_TO_THEME.get(_table, None)
                     if _theme is None:
-                        self._set_error(f"{u.tab()}theme for <{_table['name']}> not found")
+                        self._set_error(f"{u.tab()}theme for <{_table}> not found")
                         continue
                     if is_bbox:
-                        _query = Template(_table['template']).render(
-                            table=_table['name'],
+                        # _query = Template(_table['template']).render(
+                        _query = Template(query_templates.QUERY_DOWNLOAD_BY_BBOX).render(
+                            table=_table,
                             release=self.releases['latest'],
                             theme=_theme['theme'], type=_theme['type'],
                             x_min=self.x_min, x_max=self.x_max,
                             y_min=self.y_min, y_max=self.y_max
                         )
                     else:
-                        _query = Template(_table['template']).render(
-                            table=_table['name'],
+                        # _query = Template(_table['template']).render(
+                        _query = Template(query_templates.QUERY_DOWNLOAD_BY_REGION_AND_COUNTRY).render(
+                            table=_table,
                             release=self.releases['latest'],
                             theme=_theme['theme'], type=_theme['type'],
                             local_region=self.local_region,
                             country=self.country
                         )
                     con.sql(_query)
-                    self.log.debug(f"{u.tab()}data to <{_table['name']}> downloaded successfully")
-                    self._create_spatial_index(_table['name'])
-                    self._get_downloaded_data_info(_table['name'])
+                    self.log.debug(f"{u.tab()}data to <{_table}> downloaded successfully")
+                    self._create_spatial_index(_table)
+                    self._get_downloaded_data_info(_table)
                 self.log.debug(f"{u.tab()}download - OK")
             return True
         except Exception as e:
