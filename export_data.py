@@ -17,7 +17,6 @@ from pathlib import Path
 from src.config import config
 from src.common import create_logger_ext, get_log_filename
 from src.common import LOG_HDL_CNSL, LOG_HDL_FILE, LOG_FMT
-from src.common import utilities as u
 from src.common import EXPORT_FORMAT
 from src.classes import ExportCore
 
@@ -28,8 +27,6 @@ log = create_logger_ext(logger_name=config.LOGGER_NAME,
                             LOG_HDL_CNSL: {"level": logging.INFO, "format": LOG_FMT['detailed']}
                         })
 log.info(f"Hello from logger {log.name}!")
-
-
 
 
 def main():
@@ -47,7 +44,6 @@ def main():
         log.error(f"Database name not specified, please specify dbname parameter")
         return
 
-    # RESOURCE_DIR = ROOT_DIR / "resources"
     _db_filename = Path(config.DB_DIR) / args.dbname
 
     if not _db_filename.exists():
@@ -90,10 +86,6 @@ def main():
         log.info(f"Export Overture Maps data - OK")
     else:
         log.error(f"Export Overture Maps data - Fail: {export_class.get_last_error()}")
-
-
-
-
 
     log.info(f"Process to export Overture Maps data finished")
 

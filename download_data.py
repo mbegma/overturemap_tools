@@ -18,14 +18,13 @@ from src.common import create_logger_ext, get_log_filename
 from src.common import LOG_HDL_CNSL, LOG_HDL_FILE, LOG_FMT
 from src.common import utilities as u
 from src.classes import DownloadCore
-from src.common import query_templates
 
 
 log = create_logger_ext(logger_name=config.LOGGER_NAME,
                         logger_file_name=get_log_filename(config.LOG_DIR, 'download'),
                         logger_handler_type_dict={
                             LOG_HDL_FILE: {"level": logging.DEBUG, "format": LOG_FMT['extra_1']},
-                            LOG_HDL_CNSL: {"level": logging.DEBUG, "format": LOG_FMT['detailed']}
+                            LOG_HDL_CNSL: {"level": logging.INFO, "format": LOG_FMT['detailed']}
                         })
 log.info(f"Hello from logger {log.name}!")
 
@@ -99,7 +98,8 @@ def main():
         log.info(f"Data by BBox downloaded successfully")
     else:
         log.error(f"Errors while downloading data by BBox: {core.get_last_error()}")
-
+    log.info('-' * 60)
+    log.info('REPORT:')
     for _ in core.downloaded_data_info.table_info_list:
         log.info(f"{u.tab(2)}table: {_.name}")
         log.info(f"{u.tab(4)}count: {_.count} | non valid geometry: {_.not_valid_geom}")
