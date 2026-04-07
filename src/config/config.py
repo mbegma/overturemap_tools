@@ -63,6 +63,7 @@ class Config(object):
     TBL_NAME_BASE_INFRASTRUCTURE = config["TABLE_NAMES"]["base_infrastructure"]
     TBL_NAME_BASE_LAND_COVER = config["TABLE_NAMES"]["base_land_cover"]
     TBL_NAME_BASE_WATER = config["TABLE_NAMES"]["base_water"]
+    TBL_NAME_BASE_BATHYMETRY = config["TABLE_NAMES"]["base_bathymetry"]
 
     TBL_NAME_PLACES_PLACE = config["TABLE_NAMES"]["places_place"]
 
@@ -73,6 +74,7 @@ class Config(object):
     TBL_NAME_BUILDINGS_BUILDING_PART = config["TABLE_NAMES"]["buildings_building_part"]
 
     TABLE_TO_THEME = {
+        'base_bathymetry': {'theme': 'base', 'type': 'bathymetry'},
         'base_land': {'theme': 'base', 'type': 'land'},
         'base_land_use': {'theme': 'base', 'type': 'land_use'},
         'base_infrastructure': {'theme': 'base', 'type': 'infrastructure'},
