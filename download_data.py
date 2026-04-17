@@ -104,6 +104,11 @@ def main():
         log.info(f"{u.tab(2)}table: {_.name}")
         log.info(f"{u.tab(4)}count: {_.count} | non valid geometry: {_.not_valid_geom}")
         log.info(f"{u.tab(4)}geometry type count: {', '.join([f'{q[0]}: {q[1]}' for q in _.geom_type_count])}")
+
+    if len(core.error['errors']) != 0:
+        log.info('Errors:')
+        for _ in core.error['errors']:
+            log.info(f"{u.tab(2)}{_}")
     log.info(f"Process to download Overture Maps data for {args.lreg} into {args.dbname} finished")
 
 if __name__ == "__main__":
