@@ -43,7 +43,7 @@ class DownloadCore:
     def __init__(self, class_logger=None, **kwargs):
         self.log = class_logger or logging.getLogger(config.LOGGER_NAME)
         self.log.info(f"Hello, from {self.__class__.__name__} version: {self._ver}")
-        self.error = None
+        self.error = {'last_error': None, 'errors': [str]}
         self.downloaded_data_info = TableInfoList()
 
         self.releases = {}
@@ -62,11 +62,13 @@ class DownloadCore:
     def _set_info(self, info):
         self.log.info(info)
 
-    def _set_error(self, info):
-        self.error = info
+    def _set_error(self, info: str):
+        self.error['last_error'] = info
+        self.error['errors'].append(info)
         self.log.error(info)
 
     def set_parameters(self, parameters: dict):
+        self.error = {'last_error': None, 'errors': []}
         self.log.debug(parameters)
         self.x_min = parameters.get("x_min", 0.0)
         self.x_max = parameters.get("x_max", 0.0)
@@ -191,7 +193,7 @@ class DownloadCore:
                 con.sql("INSTALL httpfs;")
                 con.sql("LOAD httpfs;")
                 for _table in table_list:
-                    self.log.debug(f"{u.tab()}download data into <{_table}> ...")
+                    self.log.info(f"{u.tab()}download data into <{_table}> ...")
                     _theme = config.TABLE_TO_THEME.get(_table, None)
                     if _theme is None:
                         self._set_error(f"{u.tab()}theme for <{_table}> not found")
@@ -215,7 +217,7 @@ class DownloadCore:
                             country=self.country
                         )
                     con.sql(_query)
-                    self.log.debug(f"{u.tab()}data to <{_table}> downloaded successfully")
+                    self.log.info(f"{u.tab()}data to <{_table}> downloaded successfully")
                     self._create_spatial_index(_table)
                     self._get_downloaded_data_info(_table)
                 self.log.debug(f"{u.tab()}download - OK")
@@ -293,6 +295,12 @@ def main():
     ret = cl._get_downloaded_data_info('base_land')
     if ret:
         print(cl.downloaded_data_info.table_info_list)
+        if len(cl.error['errors']) != 0:
+            print('Errors:')
+            for _ in cl.error['errors']:
+                print(_)
+
+
     else:
         print(cl.get_last_error())
 
