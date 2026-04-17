@@ -57,7 +57,7 @@ class DownloadCore:
 
 
     def get_last_error(self):
-        return self.error
+        return self.error['last_error']
 
     def _set_info(self, info):
         self.log.info(info)
