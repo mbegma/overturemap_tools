@@ -12,18 +12,17 @@
 #        - 25.02.2026: start of development
 # -----------------------------------------------------
 import logging
+from dataclasses import dataclass, field
+from os import sep, path
 from typing import List
 
-from obstore.store import S3Store
-# import json
-from os import sep, path, makedirs
-# from datetime import datetime
-from src.config import config
-from src.common import utilities as u
 import duckdb
 from jinja2 import Template
+from obstore.store import S3Store
+
 from src.common import query_templates
-from dataclasses import dataclass, field
+from src.common import utilities as u
+from src.config import config
 
 
 @dataclass
@@ -37,13 +36,19 @@ class TableInfo:
 class TableInfoList:
     table_info_list: List[TableInfo] = field(default_factory=list)
 
+@dataclass
+class Errors:
+    last_error: str = None
+    errors: List[str] = field(default_factory=list)
+
 
 class DownloadCore:
     _ver = "1.0.0"
     def __init__(self, class_logger=None, **kwargs):
         self.log = class_logger or logging.getLogger(config.LOGGER_NAME)
         self.log.info(f"Hello, from {self.__class__.__name__} version: {self._ver}")
-        self.error = {'last_error': None, 'errors': [str]}
+        # self.error = {'last_error': None, 'errors': Union[list[type[str]], None]}
+        self.error = Errors()
         self.downloaded_data_info = TableInfoList()
 
         self.releases = {}
@@ -57,14 +62,15 @@ class DownloadCore:
 
 
     def get_last_error(self):
-        return self.error['last_error']
+        return self.error.last_error
 
     def _set_info(self, info):
         self.log.info(info)
 
     def _set_error(self, info: str):
-        self.error['last_error'] = info
-        self.error['errors'].append(info)
+        # self.error['last_error'] = info
+        self.error.last_error = info
+        self.error.errors.append(info)
         self.log.error(info)
 
     def set_parameters(self, parameters: dict):
@@ -292,19 +298,19 @@ def main():
     _regions_names = cl.get_regions_short_name()
     log.debug(f"{_regions_names}")
 
-    ret = cl._get_downloaded_data_info('base_land')
-    if ret:
-        print(cl.downloaded_data_info.table_info_list)
-        if len(cl.error['errors']) != 0:
-            print('Errors:')
-            for _ in cl.error['errors']:
-                print(_)
-
-
-    else:
-        print(cl.get_last_error())
-
-    print(ret)
+    # ret = cl._get_downloaded_data_info('base_land')
+    # if ret:
+    #     print(cl.downloaded_data_info.table_info_list)
+    #     if len(cl.error['errors']) != 0:
+    #         print('Errors:')
+    #         for _ in cl.error['errors']:
+    #             print(_)
+    #
+    #
+    # else:
+    #     print(cl.get_last_error())
+    #
+    # print(ret)
 
 if __name__ == "__main__":
     main()
